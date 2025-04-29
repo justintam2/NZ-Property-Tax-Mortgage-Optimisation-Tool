@@ -3,6 +3,8 @@ import pandas as pd
 import numpy as np
 import numpy_financial as npf
 import matplotlib.pyplot as plt
+import io
+from fpdf import FPDF
 
 st.set_page_config(page_title="NZ Property Tax & Mortgage Optimiser", layout="wide")
 
@@ -135,3 +137,101 @@ ax.set_title("Owner-Occupied Loan Strategy")
 ax.grid(True)
 ax.legend()
 st.pyplot(fig)
+import io
+from fpdf import FPDF
+
+st.subheader("📤 Export Results")
+
+# --- CSV Export ---
+csv_data = pd.DataFrame(rental_properties)
+csv_data["Annual Rent"] = [p["rent_weekly"] * 52 for p in rental_properties]
+csv_data["Interest"] = [p["loan"] * p["rate"] for p in rental_properties]
+
+csv_buffer = io.StringIO()
+csv_data.to_csv(csv_buffer, index=False)
+st.download_button("📄 Download Rental Summary as CSV", data=csv_buffer.getvalue(),
+                   file_name="rental_summary.csv", mime="text/csv")
+
+# Save the matplotlib chart image
+image_path = "/tmp/chart.png"
+with open(image_path, "wb") as f:
+    f.write(img_buffer.getvalue())
+
+class PDF(FPDF):
+    def header(self):
+        self.set_font("Arial", "B", 12)
+        self.cell(0, 10, "NZ Property Portfolio Report", ln=True, align="C")
+
+    def section(self, title, content):
+        self.set_font("Arial", "B", 11)
+        self.cell(0, 10, title, ln=True)
+        self.set_font("Arial", "", 10)
+        for line in content:
+            self.cell(0, 8, line, ln=True)
+
+pdf = PDF()
+pdf.add_page()
+
+# Summary
+pdf.section("Rental Summary", [
+    f"Total Annual Rent: ${total_rent:,.0f}",
+    f"Total Expenses: ${total_expenses:,.0f}",
+    f"Total Tax Saved: ${total_tax_savings:,.0f}",
+    f"Cash Freed from Interest-Only Loans: ${total_cash_freed:,.0f}"
+])
+
+pdf.section("Owner-Occupied Loan Strategy", [
+    f"Extra Paid into Revolving Credit: ${total_cash_freed * projection_years:,.0f}",
+    f"Cumulative Interest Saved: ${cumulative_saved:,.0f}"
+])
+
+# Chart
+pdf.add_page()
+pdf.set_font("Arial", "B", 11)
+pdf.cell(0, 10, "Interest Savings Projection", ln=True)
+pdf.image(image_path, x=10, y=None, w=180)
+
+# Rental property breakdowns
+pdf.add_page()
+pdf.set_font("Arial", "B", 12)
+pdf.cell(0, 10, "Rental Property Details", ln=True)
+
+for idx, prop in enumerate(rental_properties):
+    annual_rent = prop["rent_weekly"] * 52
+    interest = prop["loan"] * prop["rate"]
+    mgmt_cost = annual_rent * prop["mgmt_fee"]
+    expenses = interest + prop["insurance"] + prop["rates"] + prop["maintenance"] + mgmt_cost + prop["depreciation"]
+    tax_savings = min(expenses, annual_rent) * tax_rate
+
+    pdf.set_font("Arial", "B", 11)
+    pdf.cell(0, 10, f"Property {idx + 1}", ln=True)
+    pdf.set_font("Arial", "", 10)
+
+    prop_lines = [
+        f"Loan Balance: ${prop['loan']:,.0f}",
+        f"Interest Rate: {prop['rate']*100:.2f}%",
+        f"Term: {prop['term']} years",
+        f"Repayment Type: {prop['type']}",
+        f"Weekly Rent: ${prop['rent_weekly']:,.0f}",
+        f"Annual Rent: ${annual_rent:,.0f}",
+        f"Insurance: ${prop['insurance']:,.0f}",
+        f"Rates: ${prop['rates']:,.0f}",
+        f"Maintenance: ${prop['maintenance']:,.0f}",
+        f"Mgmt Fee: {prop['mgmt_fee']*100:.2f}%",
+        f"Depreciation: ${prop['depreciation']:,.0f}",
+        f"Annual Interest: ${interest:,.0f}",
+        f"Total Expenses: ${expenses:,.0f}",
+        f"Estimated Tax Savings: ${tax_savings:,.0f}"
+    ]
+
+    for line in prop_lines:
+        pdf.cell(0, 8, line, ln=True)
+    pdf.ln(4)
+
+# Finalise & Download
+pdf_buffer = io.BytesIO()
+pdf.output(pdf_buffer)
+pdf_buffer.seek(0)
+
+st.download_button("📄 Download Full PDF Report", data=pdf_buffer,
+                   file_name="nz_property_report.pdf", mime="application/pdf")
