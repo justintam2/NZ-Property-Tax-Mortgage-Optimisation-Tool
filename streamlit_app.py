@@ -160,82 +160,66 @@ image_path = "/tmp/chart.png"
 with open(image_path, "wb") as f:
     f.write(img_buffer.getvalue())
 
+from fpdf import FPDF
+import io
+
 class PDF(FPDF):
     def header(self):
-        self.set_font("Arial", "B", 12)
-        self.cell(0, 10, "NZ Property Portfolio Report", ln=True, align="C")
+        self.set_font('Arial', 'B', 12)
+        self.cell(0, 10, 'NZ Property Portfolio Report', 0, 1, 'C')  # Centered title
 
-    def section(self, title, content):
-        self.set_font("Arial", "B", 11)
-        self.cell(0, 10, title, ln=True)
-        self.set_font("Arial", "", 10)
-        for line in content:
-            self.cell(0, 8, line, ln=True)
+    def footer(self):
+        self.set_y(-15)  # Position at the bottom
+        self.set_font('Arial', 'I', 8)
+        self.cell(0, 10, f'Page {self.page_no()}', 0, 0, 'C')  # Page number centered at the bottom
 
+    def create_table(self, header, data):
+        # Table Header
+        self.set_font('Arial', 'B', 10)
+        for col in header:
+            self.cell(40, 10, col, 1, 0, 'C')
+        self.ln()
+
+        # Table Data
+        self.set_font('Arial', '', 10)
+        for row in data:
+            for item in row:
+                self.cell(40, 10, str(item), 1, 0, 'C')
+            self.ln()
+
+# Create PDF instance
 pdf = PDF()
 pdf.add_page()
 
-# Summary
-pdf.section("Rental Summary", [
-    f"Total Annual Rent: ${total_rent:,.0f}",
-    f"Total Expenses: ${total_expenses:,.0f}",
-    f"Total Tax Saved: ${total_tax_savings:,.0f}",
-    f"Cash Freed from Interest-Only Loans: ${total_cash_freed:,.0f}"
-])
-
-pdf.section("Owner-Occupied Loan Strategy", [
-    f"Extra Paid into Revolving Credit: ${total_cash_freed * projection_years:,.0f}",
-    f"Cumulative Interest Saved: ${cumulative_saved:,.0f}"
-])
-
-# Chart
-pdf.add_page()
-pdf.set_font("Arial", "B", 11)
-pdf.cell(0, 10, "Interest Savings Projection", ln=True)
-pdf.image(image_path, x=10, y=None, w=180)
-
-# Rental property breakdowns
-pdf.add_page()
+# Summary Section
 pdf.set_font("Arial", "B", 12)
+pdf.cell(0, 10, "Rental Summary", ln=True)
+pdf.set_font("Arial", "", 10)
+pdf.cell(0, 10, "Total Annual Rent: $100,000", ln=True)
+pdf.cell(0, 10, "Total Expenses: $50,000", ln=True)
+pdf.cell(0, 10, "Total Tax Saved: $15,000", ln=True)
+pdf.ln(10)
+
+# Property Details Section (Table)
+pdf.add_page()  # New page
+pdf.set_font('Arial', 'B', 12)
 pdf.cell(0, 10, "Rental Property Details", ln=True)
 
-for idx, prop in enumerate(rental_properties):
-    annual_rent = prop["rent_weekly"] * 52
-    interest = prop["loan"] * prop["rate"]
-    mgmt_cost = annual_rent * prop["mgmt_fee"]
-    expenses = interest + prop["insurance"] + prop["rates"] + prop["maintenance"] + mgmt_cost + prop["depreciation"]
-    tax_savings = min(expenses, annual_rent) * tax_rate
+# Define Table Header and Data
+header = ['Property', 'Loan Balance', 'Annual Rent', 'Tax Savings']
+data = [
+    ['Property 1', '$500,000', '$25,000', '$5,000'],
+    ['Property 2', '$300,000', '$15,000', '$3,000'],
+    ['Property 3', '$180,000', '$10,000', '$2,000']
+]
 
-    pdf.set_font("Arial", "B", 11)
-    pdf.cell(0, 10, f"Property {idx + 1}", ln=True)
-    pdf.set_font("Arial", "", 10)
+pdf.create_table(header, data)
 
-    prop_lines = [
-        f"Loan Balance: ${prop['loan']:,.0f}",
-        f"Interest Rate: {prop['rate']*100:.2f}%",
-        f"Term: {prop['term']} years",
-        f"Repayment Type: {prop['type']}",
-        f"Weekly Rent: ${prop['rent_weekly']:,.0f}",
-        f"Annual Rent: ${annual_rent:,.0f}",
-        f"Insurance: ${prop['insurance']:,.0f}",
-        f"Rates: ${prop['rates']:,.0f}",
-        f"Maintenance: ${prop['maintenance']:,.0f}",
-        f"Mgmt Fee: {prop['mgmt_fee']*100:.2f}%",
-        f"Depreciation: ${prop['depreciation']:,.0f}",
-        f"Annual Interest: ${interest:,.0f}",
-        f"Total Expenses: ${expenses:,.0f}",
-        f"Estimated Tax Savings: ${tax_savings:,.0f}"
-    ]
-
-    for line in prop_lines:
-        pdf.cell(0, 8, line, ln=True)
-    pdf.ln(4)
-
-# Finalise & Download
-# Export PDF using fpdf2
+# Save PDF to buffer
 pdf_buffer = io.BytesIO()
 pdf.output(pdf_buffer)
 pdf_buffer.seek(0)
 
+# Offer PDF for download
 st.download_button("📄 Download Full PDF Report", data=pdf_buffer,
                    file_name="nz_property_report.pdf", mime="application/pdf")
