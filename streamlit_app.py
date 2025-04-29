@@ -232,9 +232,10 @@ for idx, prop in enumerate(rental_properties):
     pdf.ln(4)
 
 # Finalise & Download
-pdf_buffer = io.BytesIO()
-pdf.output(pdf_buffer)
-pdf_buffer.seek(0)
+# Generate PDF into memory buffer
+pdf_bytes = pdf.output(dest='S').encode('latin-1')
+pdf_buffer = io.BytesIO(pdf_bytes)
 
+# Download button
 st.download_button("📄 Download Full PDF Report", data=pdf_buffer,
                    file_name="nz_property_report.pdf", mime="application/pdf")
