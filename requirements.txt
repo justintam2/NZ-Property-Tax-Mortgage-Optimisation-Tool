@@ -3,4 +3,4 @@ pandas
 numpy
 numpy-financial
 matplotlib
-fpdf
+fpdf2
