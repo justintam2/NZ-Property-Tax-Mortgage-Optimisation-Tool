@@ -137,8 +137,11 @@ ax.set_title("Owner-Occupied Loan Strategy")
 ax.grid(True)
 ax.legend()
 st.pyplot(fig)
-import io
-from fpdf import FPDF
+
+img_buffer = io.BytesIO()
+fig.savefig(img_buffer, format='png', bbox_inches='tight')
+img_buffer.seek(0)
+
 
 st.subheader("📤 Export Results")
 
